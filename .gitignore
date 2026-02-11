@@ -1,1 +1,5 @@
 /ref
+__pycache__/
+*.ipynb
+*.jpg
+*.png
