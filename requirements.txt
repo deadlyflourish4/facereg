@@ -1,0 +1,7 @@
+ultralytics        # chứa YOLO
+fastapi            # web framework
+uvicorn            # ASGI server
+python-multipart   # để nhận file upload
+pillow             # xử lý ảnh
+opencv-python
+numpy
