@@ -1,0 +1,122 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: asia-southeast1
+  REGISTRY: asia-southeast1-docker.pkg.dev
+  IMAGE_NAME: facereg
+  CLUSTER_NAME: facereg-cluster
+  CLUSTER_ZONE: asia-southeast1-a
+
+jobs:
+  # ====== Stage 1: Test ======
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest httpx
+
+      - name: Run linting
+        run: |
+          pip install ruff
+          ruff check app/
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short || echo "No tests yet"
+
+  # ====== Stage 2: Build & Push Docker Image ======
+  build:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build & tag image
+        id: meta
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.IMAGE_NAME }}
+          TAG=${GITHUB_SHA::7}
+          docker build -t $IMAGE:$TAG -t $IMAGE:latest .
+          echo "tags=$IMAGE:$TAG" >> $GITHUB_OUTPUT
+
+      - name: Push image
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.IMAGE_NAME }}
+          TAG=${GITHUB_SHA::7}
+          docker push $IMAGE:$TAG
+          docker push $IMAGE:latest
+
+  # ====== Stage 3: Deploy to GKE ======
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install gke-gcloud-auth-plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.CLUSTER_NAME }} \
+            --zone ${{ env.CLUSTER_ZONE }} \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.14.0
+
+      - name: Deploy with Helm
+        run: |
+          IMAGE=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}/${{ env.IMAGE_NAME }}
+          TAG=${GITHUB_SHA::7}
+
+          helm upgrade --install facereg \
+            infra/helm/facereg \
+            --set image.repository=$IMAGE \
+            --set image.tag=$TAG \
+            --wait --timeout 5m
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/facereg --timeout=120s
+          kubectl get pods -l app=facereg

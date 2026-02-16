@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FaceReg — Real-time Face Recognition</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #09090b;
+      --bg2: #0f0f13;
+      --bg3: #18181b;
+      --s1: rgba(255, 255, 255, .04);
+      --s2: rgba(255, 255, 255, .07);
+      --b1: rgba(255, 255, 255, .07);
+      --b2: rgba(255, 255, 255, .12);
+      --t1: #fafafa;
+      --t2: #a1a1aa;
+      --t3: #52525b;
+      --accent: #8b5cf6;
+      --accent2: #7c3aed;
+      --accent-a: rgba(139, 92, 246, .12);
+      --ok: #10b981;
+      --ok-a: rgba(16, 185, 129, .1);
+      --err: #ef4444;
+      --err-a: rgba(239, 68, 68, .1);
+      --warn: #f59e0b;
+      --r: 12px;
+      --r2: 8px;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--t1);
+      min-height: 100vh
+    }
+
+    /* HEADER */
+    .hdr {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--b1);
+      background: var(--bg)
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .brand-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      display: grid;
+      place-items: center
+    }
+
+    .brand-icon svg {
+      width: 18px;
+      height: 18px;
+      fill: #fff
+    }
+
+    .brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -.3px
+    }
+
+    .brand-name b {
+      color: var(--accent)
+    }
+
+    .sys-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--ok)
+    }
+
+    .sys-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 6px var(--ok)
+    }
+
+    /* NAV */
+    .nav {
+      display: flex;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--b1);
+      background: var(--bg2)
+    }
+
+    .nav button {
+      padding: 12px 18px;
+      font: 500 12px/1 'Inter', sans-serif;
+      color: var(--t3);
+      background: 0;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: .15s
+    }
+
+    .nav button:hover {
+      color: var(--t2)
+    }
+
+    .nav button.on {
+      color: var(--accent);
+      border-color: var(--accent)
+    }
+
+    /* LAYOUT */
+    .wrap {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 24px 28px
+    }
+
+    .sec {
+      display: none;
+      animation: up .2s
+    }
+
+    .sec.on {
+      display: block
+    }
+
+    @keyframes up {
+      from {
+        opacity: 0;
+        transform: translateY(6px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    .g2 {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 18px
+    }
+
+    @media(max-width:860px) {
+      .g2 {
+        grid-template-columns: 1fr
+      }
+    }
+
+    /* CAMERA */
+    .cam-box {
+      position: relative;
+      border-radius: var(--r);
+      overflow: hidden;
+      background: #000;
+      border: 1px solid var(--b1);
+      aspect-ratio: 4/3
+    }
+
+    .cam-box video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none
+    }
+
+    .cam-box canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none
+    }
+
+    .cam-ph {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--t3);
+      gap: 6px
+    }
+
+    .cam-ph svg {
+      width: 40px;
+      height: 40px;
+      stroke: var(--t3);
+      fill: none;
+      stroke-width: 1.5
+    }
+
+    .cam-ph span {
+      font-size: 12px
+    }
+
+    .hud {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      display: flex;
+      gap: 6px;
+      display: none
+    }
+
+    .hud-p {
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      background: rgba(0, 0, 0, .65);
+      backdrop-filter: blur(6px);
+      border: 1px solid rgba(255, 255, 255, .06)
+    }
+
+    .hud-live {
+      color: var(--ok)
+    }
+
+    .hud-fps {
+      color: var(--t2)
+    }
+
+    .cam-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px
+    }
+
+    /* STATS */
+    .stats {
+      display: flex;
+      gap: 18px;
+      margin-top: 8px
+    }
+
+    .st {
+      font-size: 11px;
+      color: var(--t3)
+    }
+
+    .st b {
+      color: var(--t1);
+      font-size: 14px;
+      font-weight: 600;
+      margin-right: 2px
+    }
+
+    /* CARD */
+    .card {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r);
+      padding: 18px
+    }
+
+    .card-h {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--t2);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: .4px
+    }
+
+    /* FORM */
+    .field {
+      margin-bottom: 10px
+    }
+
+    .lbl {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--t3);
+      margin-bottom: 3px;
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: .5px
+    }
+
+    .inp {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: var(--r2);
+      border: 1px solid var(--b1);
+      background: var(--bg);
+      color: var(--t1);
+      font: 13px/1.4 'Inter', sans-serif;
+      outline: 0;
+      transition: .15s
+    }
+
+    .inp:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-a)
+    }
+
+    .inp[type=file] {
+      font-size: 11px;
+      padding: 8px 10px
+    }
+
+    .inp::file-selector-button {
+      padding: 3px 10px;
+      border-radius: 5px;
+      border: 1px solid var(--b1);
+      background: var(--s2);
+      color: var(--t1);
+      font: 11px 'Inter', sans-serif;
+      cursor: pointer;
+      margin-right: 6px
+    }
+
+    /* BTN */
+    .btn {
+      padding: 9px 18px;
+      border-radius: var(--r2);
+      border: 1px solid var(--b1);
+      background: var(--s2);
+      color: var(--t1);
+      font: 500 12px/1 'Inter', sans-serif;
+      cursor: pointer;
+      transition: .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap
+    }
+
+    .btn:hover {
+      background: var(--s1);
+      border-color: var(--b2)
+    }
+
+    .btn-p {
+      background: var(--accent);
+      border: 0;
+      color: #fff;
+      box-shadow: 0 1px 8px rgba(139, 92, 246, .2)
+    }
+
+    .btn-p:hover {
+      background: var(--accent2);
+      box-shadow: 0 2px 14px rgba(139, 92, 246, .35);
+      transform: translateY(-1px)
+    }
+
+    .btn-d {
+      background: var(--err-a);
+      border-color: rgba(239, 68, 68, .12);
+      color: var(--err)
+    }
+
+    .btn-w {
+      width: 100%;
+      justify-content: center
+    }
+
+    .btn-s {
+      padding: 5px 10px;
+      font-size: 10px
+    }
+
+    /* PIPE */
+    .pipe {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 14px
+    }
+
+    .pp {
+      flex: 1;
+      padding: 5px 0;
+      text-align: center;
+      border-radius: 5px;
+      font-size: 8px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      background: var(--s1);
+      color: var(--t3);
+      border: 1px solid var(--b1);
+      transition: .25s
+    }
+
+    .pp.ok {
+      background: var(--ok-a);
+      border-color: rgba(16, 185, 129, .12);
+      color: var(--ok)
+    }
+
+    /* RESULTS */
+    .res {
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r2);
+      padding: 12px;
+      margin-top: 10px;
+      animation: up .2s
+    }
+
+    .rr {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      font-size: 12px
+    }
+
+    .rk {
+      color: var(--t3);
+      font-size: 11px
+    }
+
+    .rv {
+      font-weight: 600
+    }
+
+    .tag {
+      padding: 2px 8px;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 600
+    }
+
+    .tg {
+      background: var(--ok-a);
+      color: var(--ok)
+    }
+
+    .tr {
+      background: var(--err-a);
+      color: var(--err)
+    }
+
+    .tp {
+      background: var(--accent-a);
+      color: var(--accent)
+    }
+
+    /* FACE LIST */
+    .fl {
+      display: flex;
+      flex-direction: column;
+      gap: 5px
+    }
+
+    .fi {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      border-radius: var(--r2);
+      transition: .15s
+    }
+
+    .fi.mt {
+      border-color: rgba(16, 185, 129, .15);
+      background: rgba(16, 185, 129, .03)
+    }
+
+    .fi.uk {
+      border-color: rgba(245, 158, 11, .1);
+      background: rgba(245, 158, 11, .02)
+    }
+
+    .fn {
+      font-size: 12px;
+      font-weight: 600
+    }
+
+    .fs {
+      font-size: 10px;
+      color: var(--t3)
+    }
+
+    /* USERS */
+    .ur {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: var(--r2);
+      background: var(--s1);
+      border: 1px solid var(--b1);
+      margin-bottom: 5px
+    }
+
+    .un {
+      font-size: 12px;
+      font-weight: 600
+    }
+
+    .ui {
+      font-size: 10px;
+      color: var(--t3)
+    }
+
+    .empty {
+      text-align: center;
+      padding: 32px;
+      color: var(--t3);
+      font-size: 12px
+    }
+
+    .empty svg {
+      width: 36px;
+      height: 36px;
+      stroke: var(--t3);
+      fill: none;
+      stroke-width: 1.5;
+      margin-bottom: 6px;
+      display: block;
+      margin-inline: auto
+    }
+
+    .json {
+      background: var(--bg);
+      border: 1px solid var(--b1);
+      border-radius: 6px;
+      padding: 8px;
+      font: 10px/1.4 'Cascadia Code', monospace;
+      color: var(--t3);
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-top: 6px
+    }
+
+    .spin {
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--b1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: sp .4s linear infinite;
+      display: inline-block
+    }
+
+    @keyframes sp {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    .cap-b {
+      font-size: 10px;
+      color: var(--ok);
+      margin-bottom: 6px;
+      font-weight: 500
+    }
+
+    ::-webkit-scrollbar {
+      width: 3px
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, .05);
+      border-radius: 2px
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="hdr">
+    <div class="brand">
+      <div class="brand-icon"><svg viewBox="0 0 24 24">
+          <path
+            d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+        </svg></div>
+      <div class="brand-name">Face<b>Reg</b></div>
+    </div>
+    <div class="sys-status"><span class="sys-dot"></span>Online</div>
+  </header>
+
+  <nav class="nav">
+    <button class="on" onclick="go('live',this)">Live Recognition</button>
+    <button onclick="go('register',this)">Register</button>
+    <button onclick="go('verify',this)">Verify (1:1)</button>
+    <button onclick="go('identify',this)">Identify (1:N)</button>
+    <button id="navU" onclick="go('users',this);loadUsers()">Users</button>
+  </nav>
+
+  <main class="wrap">
+
+    <!-- LIVE -->
+    <div class="sec on" id="sec-live">
+      <div class="g2">
+        <div>
+          <div class="cam-box" id="liveCamWrap">
+            <video id="liveCam" autoplay playsinline></video>
+            <canvas id="liveCanvas"></canvas>
+            <div class="cam-ph" id="livePh">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>Click Start to begin</span>
+            </div>
+            <div class="hud" id="liveHud">
+              <span class="hud-p hud-live">LIVE</span>
+              <span class="hud-p hud-fps" id="hFps">—</span>
+              <span class="hud-p" id="hFaces">—</span>
+            </div>
+          </div>
+          <div class="cam-bar">
+            <button class="btn btn-p" id="btnLive" onclick="toggleLive()">Start Recognition</button>
+          </div>
+          <div class="stats">
+            <div class="st"><b id="sD">0</b>detected</div>
+            <div class="st"><b id="sI">0</b>identified</div>
+            <div class="st"><b id="sU">0</b>unknown</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">Recognized Faces</div>
+          <div class="fl" id="liveRes">
+            <div class="empty">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M5.5 21a7.5 7.5 0 0113 0" />
+              </svg>
+              Start recognition to see results
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div class="sec" id="sec-register">
+      <div class="pipe" id="pReg">
+        <div class="pp">Detect</div>
+        <div class="pp">Quality</div>
+        <div class="pp">Spoof</div>
+        <div class="pp">Align</div>
+        <div class="pp">Embed</div>
+        <div class="pp">Save</div>
+      </div>
+      <div class="g2">
+        <div>
+          <div class="cam-box">
+            <video id="regCam" autoplay playsinline></video>
+            <canvas id="regCanvas"></canvas>
+            <div class="cam-ph" id="regPh">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                <path
+                  d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+              </svg>
+              <span>Upload or capture</span>
+            </div>
+          </div>
+          <div class="cam-bar">
+            <button class="btn" onclick="toggleCam('reg')">Camera</button>
+            <button class="btn" onclick="capture('reg')">Capture</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">Register New Face</div>
+          <div class="field"><label class="lbl">User ID</label><input class="inp" id="regUid" placeholder="john_doe">
+          </div>
+          <div class="field"><label class="lbl">Display Name</label><input class="inp" id="regName"
+              placeholder="John Doe"></div>
+          <div class="field"><label class="lbl">Face Images</label><input class="inp" type="file" id="regFiles" multiple
+              accept="image/*"></div>
+          <div class="cap-b" id="regCap"></div>
+          <button class="btn btn-p btn-w" onclick="doReg()">Register</button>
+          <div id="regRes"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VERIFY -->
+    <div class="sec" id="sec-verify">
+      <div class="pipe" id="pVer">
+        <div class="pp">Detect</div>
+        <div class="pp">Quality</div>
+        <div class="pp">Spoof</div>
+        <div class="pp">Align</div>
+        <div class="pp">Embed</div>
+        <div class="pp">Match</div>
+      </div>
+      <div class="g2">
+        <div>
+          <div class="cam-box">
+            <video id="verifyCam" autoplay playsinline></video>
+            <canvas id="verifyCanvas"></canvas>
+            <div class="cam-ph" id="verifyPh">
+              <svg viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Upload or capture</span>
+            </div>
+          </div>
+          <div class="cam-bar">
+            <button class="btn" onclick="toggleCam('verify')">Camera</button>
+            <button class="btn" onclick="capture('verify')">Capture</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">Verify Identity</div>
+          <p style="font-size:11px;color:var(--t3);margin-bottom:10px">1:1 match against a registered user</p>
+          <div class="field"><label class="lbl">User ID</label><input class="inp" id="verUid" placeholder="john_doe">
+          </div>
+          <div class="field"><label class="lbl">Face Image</label><input class="inp" type="file" id="verFile"
+              accept="image/*"></div>
+          <button class="btn btn-p btn-w" onclick="doVer()">Verify</button>
+          <div id="verRes"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IDENTIFY -->
+    <div class="sec" id="sec-identify">
+      <div class="pipe" id="pId">
+        <div class="pp">Detect</div>
+        <div class="pp">Quality</div>
+        <div class="pp">Spoof</div>
+        <div class="pp">Align</div>
+        <div class="pp">Embed</div>
+        <div class="pp">Search</div>
+      </div>
+      <div class="g2">
+        <div>
+          <div class="cam-box">
+            <video id="identifyCam" autoplay playsinline></video>
+            <canvas id="identifyCanvas"></canvas>
+            <div class="cam-ph" id="identifyPh">
+              <svg viewBox="0 0 24 24">
+                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span>Upload or capture</span>
+            </div>
+          </div>
+          <div class="cam-bar">
+            <button class="btn" onclick="toggleCam('identify')">Camera</button>
+            <button class="btn" onclick="capture('identify')">Capture</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">Identify Face</div>
+          <p style="font-size:11px;color:var(--t3);margin-bottom:10px">Search across all registered users</p>
+          <div class="field"><label class="lbl">Face Image</label><input class="inp" type="file" id="idFile"
+              accept="image/*"></div>
+          <button class="btn btn-p btn-w" onclick="doId()">Identify</button>
+          <div id="idRes"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="sec" id="sec-users">
+      <div style="max-width:560px">
+        <div class="card">
+          <div class="card-h">Registered Users</div>
+          <button class="btn btn-w" onclick="loadUsers()" style="margin-bottom:10px">Refresh</button>
+          <div id="userList"></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const API = window.location.origin, WS = `ws://${window.location.host}`;
+    const cams = {}, caps = {};
+    let ws = null, live = false, idInt = null, lastId = [], sD = 0, sI = 0, sU = 0;
+
+    function go(id, b) { document.querySelectorAll('.sec').forEach(s => s.classList.remove('on')); document.querySelectorAll('.nav button').forEach(b => b.classList.remove('on')); document.getElementById('sec-' + id).classList.add('on'); b.classList.add('on') }
+
+    // CAMERA
+    async function toggleCam(s) { const v = document.getElementById(s + 'Cam'), p = document.getElementById(s + 'Ph'); if (cams[s]) { cams[s].getTracks().forEach(t => t.stop()); cams[s] = null; v.style.display = 'none'; p.style.display = 'flex'; return } const st = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }); cams[s] = st; v.srcObject = st; v.style.display = 'block'; p.style.display = 'none' }
+    function capture(s) { if (!cams[s]) { alert('Start camera first'); return } const v = document.getElementById(s + 'Cam'), c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0); c.toBlob(b => { if (s === 'reg') { if (!caps.reg) caps.reg = []; caps.reg.push(b); document.getElementById('regCap').textContent = caps.reg.length + ' captured' } else caps[s] = b }, 'image/jpeg', .9) }
+
+    // PIPELINE ANIM
+    function ap(id, n) { const el = document.getElementById(id); if (!el) return; const ps = el.querySelectorAll('.pp'); ps.forEach(p => p.className = 'pp'); for (let i = 0; i < n && i < ps.length; i++)setTimeout(() => ps[i].classList.add('ok'), i * 200) }
+
+    // REGISTER
+    async function doReg() {
+      const uid = document.getElementById('regUid').value, name = document.getElementById('regName').value;
+      if (!uid || !name) { alert('Fill User ID and Name'); return }
+      const fd = new FormData(); fd.append('user_id', uid); fd.append('name', name);
+      const fi = document.getElementById('regFiles');
+      if (fi.files.length > 0) for (const f of fi.files) fd.append('files', f);
+      else if (caps.reg?.length > 0) caps.reg.forEach((b, i) => fd.append('files', new File([b], `c${i}.jpg`, { type: 'image/jpeg' })));
+      else { alert('Upload images or capture'); return }
+      document.getElementById('regRes').innerHTML = '<div style="text-align:center;padding:14px"><span class="spin"></span></div>';
+      ap('pReg', 6);
+      const r = await fetch(`${API}/register`, { method: 'POST', body: fd }), d = await r.json(), ok = d.status === 'success';
+      document.getElementById('regRes').innerHTML = `<div class="res"><div class="rr"><span class="rk">Status</span><span class="tag ${ok ? 'tg' : 'tr'}">${d.status}</span></div>${d.images_processed != null ? `<div class="rr"><span class="rk">Processed</span><span class="rv">${d.images_processed}</span></div>` : ''}${d.message ? `<div class="rr"><span class="rk">Message</span><span class="rv">${d.message}</span></div>` : ''}</div><div class="json">${JSON.stringify(d, null, 2)}</div>`;
+      caps.reg = []; document.getElementById('regCap').textContent = '';
+    }
+
+    // VERIFY
+    async function doVer() {
+      const uid = document.getElementById('verUid').value; if (!uid) { alert('Enter User ID'); return }
+      const fi = document.getElementById('verFile');
+      let f = fi.files[0] || (caps.verify ? new File([caps.verify], 'c.jpg', { type: 'image/jpeg' }) : null);
+      if (!f) { alert('Upload or capture'); return }
+      const fd = new FormData(); fd.append('user_id', uid); fd.append('file', f);
+      document.getElementById('verRes').innerHTML = '<div style="text-align:center;padding:14px"><span class="spin"></span></div>';
+      ap('pVer', 6);
+      const r = await fetch(`${API}/verify`, { method: 'POST', body: fd }), d = await r.json();
+      document.getElementById('verRes').innerHTML = `<div class="res"><div class="rr"><span class="rk">Result</span><span class="tag ${d.match ? 'tg' : 'tr'}">${d.match ? 'MATCH' : 'NO MATCH'}</span></div>${d.similarity != null ? `<div class="rr"><span class="rk">Similarity</span><span class="rv">${(d.similarity * 100).toFixed(1)}%</span></div>` : ''}${d.error ? `<div class="rr"><span class="rk">Error</span><span class="tag tr">${d.error}</span></div>` : ''}</div><div class="json">${JSON.stringify(d, null, 2)}</div>`;
+    }
+
+    // IDENTIFY
+    async function doId() {
+      const fi = document.getElementById('idFile');
+      let f = fi.files[0] || (caps.identify ? new File([caps.identify], 'c.jpg', { type: 'image/jpeg' }) : null);
+      if (!f) { alert('Upload or capture'); return }
+      const fd = new FormData(); fd.append('file', f);
+      document.getElementById('idRes').innerHTML = '<div style="text-align:center;padding:14px"><span class="spin"></span></div>';
+      ap('pId', 6);
+      const r = await fetch(`${API}/identify`, { method: 'POST', body: fd }), d = await r.json();
+      document.getElementById('idRes').innerHTML = `<div class="res"><div class="rr"><span class="rk">Candidates</span><span class="rv">${d.total_candidates || 0}</span></div></div>${(d.candidates || []).map((c, i) => `<div class="res" style="margin-top:5px"><div class="rr"><span class="rk">#${i + 1}</span><span class="fn">${c.name}</span></div><div class="rr"><span class="rk">Similarity</span><span class="tag tg">${(c.similarity * 100).toFixed(1)}%</span></div></div>`).join('')}${d.error ? `<div class="res"><span class="tag tr">${d.error}</span></div>` : ''}<div class="json">${JSON.stringify(d, null, 2)}</div>`;
+    }
+
+    // LIVE
+    function toggleLive() { live ? stopLive() : startLive() }
+    async function startLive() {
+      const v = document.getElementById('liveCam'), p = document.getElementById('livePh');
+      if (!cams.live) { const s = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }); cams.live = s; v.srcObject = s; v.style.display = 'block'; p.style.display = 'none' }
+      ws = new WebSocket(`${WS}/ws/detect`); live = true; sD = 0; sI = 0; sU = 0; lastId = [];
+      document.getElementById('btnLive').textContent = 'Stop'; document.getElementById('btnLive').className = 'btn btn-d';
+      document.getElementById('liveHud').style.display = 'flex';
+      ws.onopen = () => sf();
+      ws.onmessage = e => {
+        const d = JSON.parse(e.data);
+        drawOv(d.faces || [], lastId);
+        document.getElementById('hFps').textContent = (d.fps || 0) + ' FPS';
+        document.getElementById('hFaces').textContent = (d.total_faces || 0) + ' face' + (d.total_faces !== 1 ? 's' : '');
+        sD += (d.total_faces || 0); document.getElementById('sD').textContent = sD;
+        if (!d.faces || !d.faces.length) { document.getElementById('liveRes').innerHTML = '<div class="empty" style="padding:16px">No faces in frame</div>' }
+        else if (!lastId.length) { document.getElementById('liveRes').innerHTML = d.faces.map((_, i) => `<div class="fi uk"><div><div class="fn">Scanning...</div><div class="fs">Identifying face</div></div><span class="spin"></span></div>`).join('') }
+        setTimeout(sf, 80);
+      };
+      idInt = setInterval(async () => {
+        if (!cams.live || !live) return;
+        const v2 = document.getElementById('liveCam'), c = document.createElement('canvas'); c.width = 640; c.height = 480; c.getContext('2d').drawImage(v2, 0, 0, 640, 480);
+        c.toBlob(async b => {
+          if (!b) return; const fd = new FormData(); fd.append('file', new File([b], 'f.jpg', { type: 'image/jpeg' }));
+          try {
+            const r = await fetch(`${API}/identify`, { method: 'POST', body: fd }), d = await r.json();
+            if (d.candidates && d.candidates.length > 0) {
+              lastId = d.candidates; sI++; document.getElementById('sI').textContent = sI;
+              document.getElementById('liveRes').innerHTML = d.candidates.map(c => `<div class="fi mt"><div><div class="fn">${c.name}</div><div class="fs">${c.user_id} · ${(c.similarity * 100).toFixed(1)}% match</div></div><span class="tag tg">Identified</span></div>`).join('')
+            }
+            else { lastId = []; sU++; document.getElementById('sU').textContent = sU }
+          } catch (e) { }
+        }, 'image/jpeg', .8);
+      }, 2000);
+    }
+    function stopLive() { if (ws) { ws.close(); ws = null } if (idInt) { clearInterval(idInt); idInt = null } live = false; lastId = []; document.getElementById('btnLive').textContent = 'Start Recognition'; document.getElementById('btnLive').className = 'btn btn-p'; document.getElementById('liveHud').style.display = 'none'; clr('liveCanvas') }
+    function sf() { if (!ws || ws.readyState !== 1 || !cams.live) return; const v = document.getElementById('liveCam'), c = document.createElement('canvas'); c.width = 640; c.height = 480; c.getContext('2d').drawImage(v, 0, 0, 640, 480); c.toBlob(b => { if (!b || !ws || ws.readyState !== 1) return; const r = new FileReader(); r.onload = () => ws.send(r.result); r.readAsDataURL(b) }, 'image/jpeg', .7) }
+
+    // OVERLAY
+    function drawOv(faces, identified) {
+      const cv = document.getElementById('liveCanvas'), v = document.getElementById('liveCam'), ctx = cv.getContext('2d');
+      cv.width = v.videoWidth || 640; cv.height = v.videoHeight || 480; ctx.clearRect(0, 0, cv.width, cv.height);
+      const top = identified && identified.length ? identified[0] : null;
+      faces.forEach((f, i) => {
+        const [x1, y1, x2, y2] = f.bbox, w = x2 - x1, h = y2 - y1, hit = top && i === 0, col = hit ? '#10b981' : '#8b5cf6', glow = hit ? 'rgba(16,185,129,.35)' : 'rgba(139,92,246,.3)';
+        ctx.shadowColor = glow; ctx.shadowBlur = 10; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(x1, y1, w, h); ctx.shadowBlur = 0;
+        const cn = 14; ctx.lineWidth = 3; ctx.strokeStyle = col;
+        ctx.beginPath(); ctx.moveTo(x1, y1 + cn); ctx.lineTo(x1, y1); ctx.lineTo(x1 + cn, y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x2 - cn, y1); ctx.lineTo(x2, y1); ctx.lineTo(x2, y1 + cn); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x1, y2 - cn); ctx.lineTo(x1, y2); ctx.lineTo(x1 + cn, y2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x2 - cn, y2); ctx.lineTo(x2, y2); ctx.lineTo(x2, y2 - cn); ctx.stroke();
+        let lbl, bg;
+        if (hit) { lbl = top.name + ' · ' + (top.similarity * 100).toFixed(0) + '%'; bg = 'rgba(16,185,129,.88)' }
+        else { lbl = (f.confidence * 100).toFixed(0) + '%'; bg = 'rgba(139,92,246,.88)' }
+        ctx.font = '600 11px Inter'; const tw = ctx.measureText(lbl).width;
+        ctx.fillStyle = bg; rr(ctx, x1, y1 - 24, tw + 14, 20, 4); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(lbl, x1 + 7, y1 - 9);
+        if (f.landmarks) { ctx.fillStyle = hit ? '#10b981' : '#a78bfa'; f.landmarks.forEach(([lx, ly]) => { ctx.beginPath(); ctx.arc(lx, ly, 2, 0, Math.PI * 2); ctx.fill() }) }
+      });
+    }
+    function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.quadraticCurveTo(x + w, y, x + w, y + r); c.lineTo(x + w, y + h - r); c.quadraticCurveTo(x + w, y + h, x + w - r, y + h); c.lineTo(x + r, y + h); c.quadraticCurveTo(x, y + h, x, y + h - r); c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y) }
+    function clr(id) { const c = document.getElementById(id); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height) }
+
+    // USERS
+    async function loadUsers() { const r = await fetch(`${API}/users`), d = await r.json(), n = d.users?.length || 0; document.getElementById('userList').innerHTML = n ? d.users.map(u => `<div class="ur"><div><div class="un">${u.name}</div><div class="ui">${u.user_id}</div></div><button class="btn btn-d btn-s" onclick="delU('${u.user_id}')">Delete</button></div>`).join('') : '<div class="empty"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5.5 21a7.5 7.5 0 0113 0"/></svg>No users registered</div>' }
+    async function delU(id) { if (!confirm('Delete ' + id + '?')) return; await fetch(`${API}/users/${id}`, { method: 'DELETE' }); loadUsers() }
+
+    // INIT
+    fetch(`${API}/users`).then(r => r.json()).then(d => { const n = d.users?.length || 0; if (n > 0) { const b = document.getElementById('navU'); if (b) b.textContent = 'Users (' + n + ')' } }).catch(() => { });
+  </script>
+</body>
+
+</html>

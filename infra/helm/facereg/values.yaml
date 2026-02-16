@@ -1,0 +1,53 @@
+replicaCount: 2
+
+image:
+  repository: asia-southeast1-docker.pkg.dev/PROJECT_ID/facereg/facereg
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "facereg"
+  hosts:
+    - host: facereg.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+env:
+  CONFIDENCE_THRESHOLD: "0.5"
+  SPOOF_THRESHOLD: "0.5"
+  MATCH_THRESHOLD: "0.5"
+  DETECT_EVERY_N_FRAMES: "3"
+  KAFKA_ENABLED: "true"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+
+persistence:
+  enabled: true
+  storageClass: "standard"
+  size: 5Gi
+
+kafka:
+  enabled: true

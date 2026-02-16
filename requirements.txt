@@ -1,7 +1,15 @@
-ultralytics        # chứa YOLO
-fastapi            # web framework
-uvicorn            # ASGI server
-python-multipart   # để nhận file upload
-pillow             # xử lý ảnh
-opencv-python
+# Core
+ultralytics
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+opencv-python-headless
 numpy
+
+# Face Recognition
+insightface
+onnxruntime
+
+# Kafka
+kafka-python

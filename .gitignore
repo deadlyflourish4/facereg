@@ -1,5 +1,11 @@
 /ref
 __pycache__/
+*.pyc
 *.ipynb
 *.jpg
 *.png
+data/
+.venv/
+venv/
+temp_*
+.gemini/

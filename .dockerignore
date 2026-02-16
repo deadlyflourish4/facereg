@@ -1,0 +1,15 @@
+.git
+__pycache__
+*.pyc
+.venv
+venv
+*.md
+.vscode
+.gemini
+notebooks/
+ref/
+tests/
+*.ipynb
+*.jpg
+*.png
+temp_*
